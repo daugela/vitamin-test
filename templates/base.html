@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset='UTF-8'>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel='stylesheet' href='//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css'>
+
+</head>
+<body style="padding-top:50px;">
+<div class="container" ng-app="angularapp" ng-controller="ngController">
+  
+  <div class="alert alert-success">
+    Define time threshold for time-consuming task (single workweek is maximum): {% raw %}{{ value }}{% endraw %}h<br>
+    {% raw %}<input type="range" name="range" ng-model="value" min="{{ min }}"  max="{{ max }}">{% endraw %}
+  </div>
+  
+  <form>
+    <div class="form-group">
+      <div class="input-group">
+        <div class="input-group-addon"><i class="fa fa-search"></i></div>
+        <input type="text" class="form-control" placeholder="Further search for task, project or something else.." ng-model="searchTask">
+      </div>      
+    </div>
+  </form>
+  
+  <table class="table table-bordered table-striped">
+    
+    <thead>
+      <tr>
+        <td>
+          <a href="#" ng-click="sortType = 'description'; sortReverse = !sortReverse">
+            The time-consuming tasks present in the local data-store
+            <span ng-show="sortType == 'description' && !sortReverse" class="fa fa-caret-down"></span>
+            <span ng-show="sortType == 'description' && sortReverse" class="fa fa-caret-up"></span>
+          </a>
+        </td>
+        <td>
+          <a href="#" ng-click="sortType = 'dur'; sortReverse = !sortReverse">
+          The total task time 
+            <span ng-show="sortType == 'dur' && !sortReverse" class="fa fa-caret-down"></span>
+            <span ng-show="sortType == 'dur' && sortReverse" class="fa fa-caret-up"></span>
+          </a>
+        </td>
+        <td>
+          <a href="#" ng-click="sortType = 'project'; sortReverse = !sortReverse">
+          The task project
+            <span ng-show="sortType == 'project' && !sortReverse" class="fa fa-caret-down"></span>
+            <span ng-show="sortType == 'project' && sortReverse" class="fa fa-caret-up"></span>
+          </a>
+        </td>
+        <td>
+          <a href="#" ng-click="sortType = 'client'; sortReverse = !sortReverse">
+         The task client
+            <span ng-show="sortType == 'client' && !sortReverse" class="fa fa-caret-down"></span>
+            <span ng-show="sortType == 'client' && sortReverse" class="fa fa-caret-up"></span>
+          </a>
+        </td>
+        <td>
+          <a href="#" ng-click="sortType = 'start'; sortReverse = !sortReverse">
+          The month
+            <span ng-show="sortType == 'start' && !sortReverse" class="fa fa-caret-down"></span>
+            <span ng-show="sortType == 'start' && sortReverse" class="fa fa-caret-up"></span>
+          </a>
+        </td>
+      </tr>
+    </thead>
+    
+    <tbody>
+      <tr ng-repeat="singletask in alltasks | orderBy:sortType:sortReverse | filter:displayedtasks | filter:searchTask">
+        {% raw %}
+        <td>{{ ::singletask.description }}</td>
+        <td>{{ ::singletask.dur | changeMilisecondstoHours }}</td>
+        <td>{{ ::singletask.project }}</td>
+        <td>{{ ::singletask.client }}</td>
+        <td>{{ ::singletask.start | date:'MMMM' }}</td>
+        {% endraw %}
+      </tr>
+      <tr ng-show="!(alltasks | filter:displayedtasks).length">
+        {% raw %}
+        <td colspan="5" style="text-align: center;">Woohoo - no time consuming tasks larger than {{ value }} hours!!!!</td>
+        {% endraw %}
+      </tr>
+    </tbody>
+    
+  </table>
+
+
+  <div class="alert alert-info">
+    <form>
+      <div class="form-group">
+
+      <label for="description">Enter task description</label>
+      <input type="text" class="form-control" ng-model="description"><br>
+
+      <label for="month">Select entry month:</label>
+      <select class="form-control" id="month" ng-model="month">
+        <option value="11">November</option>
+        <option value="12">December</option>
+      </select>
+
+      <label for="month">Duration</label>
+      <select class="form-control" id="month" ng-model="duration">
+        <option value="3600">1 Hour</option>
+        <option value="7200">2 Hours</option>
+        <option value="10800">3 Hours</option>
+        <option value="14400">4 Hours</option>
+        <option value="18000">5 Hours</option>
+        <option value="21600">6 Hours</option>
+        <option value="43200">12 Hours</option>
+      </select>
+      <br>
+      <button class="form-control" ng-click="post_to_flask()">Add new entry (date will be populated for you)</button>
+    </div>
+    </form>
+  </div>
+
+
+
+
+  <!--<p style="font-size: 8px;">{{ alltasks }}</p>-->
+  <p class="text-center">Test result created for <a href="https://www.vitaminsoftware.com" target="_blank">Vitamin</a> team consideration.</p>
+  
+</div>
+<script src='//ajax.googleapis.com/ajax/libs/angularjs/1.3.2/angular.min.js'></script>
+<script>
+
+var app = angular.module('angularapp', []);
+
+app.controller('ngController', function ($scope, $http) {
+
+  $scope.get_from_flask = function () {
+
+    var request = $http({
+        method: "GET",
+        url: "http://46.101.202.234:8000/serve",
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+    request.success(function (cache) {
+        //console.log(cache);
+        $scope.alltasks = cache['data'];
+    });
+
+  }
+
+  $scope.displayedtasks = function (singletask) {
+    return singletask.dur >= $scope.value * 3600000; //Count in miliseconds
+  };
+
+  $scope.post_to_flask = function () {
+
+    if($scope.description.length > 0){
+
+      //console.log({description: $scope.description, duration: parseInt($scope.duration), month: $scope.month});
+
+      var request = $http({
+          method: "POST",
+          url: "http://46.101.202.234:8000/create-time-entry",
+          data: {
+              description: $scope.description,
+              duration: parseInt($scope.duration),
+              month: $scope.month
+          },
+          headers: { 'Content-Type': 'application/json' }
+      });
+
+      request.success(function (data) {
+          alert("New task was posted and local cache updated");
+          $scope.get_from_flask();
+          $scope.description = "";
+      });
+
+
+    }else{
+      alert("Enter some sort of description");
+    }
+
+  }
+
+  $scope.sortType = 'description'; // set the default sort type
+  $scope.sortReverse = false; // set the default sort order
+  $scope.searchTask = ''; // set the default search/filter term
+
+  //Range slider
+  $scope.value = 4;
+  $scope.min = 0;
+  $scope.max = 40;
+
+  $scope.description = "Some job description";
+  $scope.month = "11";
+  $scope.duration = "7200";
+
+  $scope.alltasks = [];
+  $scope.get_from_flask();
+
+
+});
+
+app.filter('changeMilisecondstoHours', function() {
+
+  return function(miliseconds) {
+    var hours = (miliseconds / 3600000).toFixed(2);
+    return hours;
+  }
+
+});
+
+</script>
+</body>
+</html>
